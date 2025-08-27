@@ -5,9 +5,9 @@
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="screenshots/1.png" alt="Circular Spotlight" width="200"/>
-  <img src="screenshots/2.png" alt="Rectangular Spotlight" width="200"/>
-  <img src="screenshots/3.png" alt="Custom Tooltip" width="200"/>
+  <img src="https://github.com/febin52/feature_spotlight/blob/main/screenshots/1.png?raw=true" alt="Circular Spotlight" width="200"/>
+  <img src="https://github.com/febin52/feature_spotlight/blob/main/screenshots/2.png?raw=true" alt="Rectangular Spotlight" width="200"/>
+  <img src="https://github.com/febin52/feature_spotlight/blob/main/screenshots/3.png?raw=true" alt="Custom Tooltip" width="200"/>
 </p>
 
 ## ✨ Features
