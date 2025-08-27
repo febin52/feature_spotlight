@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-// Enum for the shape of the spotlight highlight
 enum SpotlightShape {
   circle,
   rectangle,
@@ -9,6 +8,7 @@ enum SpotlightShape {
 // A typedef for the custom tooltip builder function
 typedef SpotlightTooltipBuilder = Widget Function(
   VoidCallback onNext,
+  VoidCallback onPrevious,
   VoidCallback onSkip,
 );
 
@@ -19,6 +19,7 @@ class SpotlightStep {
   final SpotlightShape shape;
   final Alignment contentAlignment;
   final SpotlightTooltipBuilder? tooltipBuilder;
+  final EdgeInsets padding;
 
   SpotlightStep({
     required this.id,
@@ -26,6 +27,7 @@ class SpotlightStep {
     this.shape = SpotlightShape.rectangle,
     this.contentAlignment = Alignment.center,
     this.tooltipBuilder,
+    this.padding = EdgeInsets.zero,
   }) : assert(text != null || tooltipBuilder != null,
             'Either text or tooltipBuilder must be provided.');
 }
@@ -36,7 +38,16 @@ class SpotlightController extends ChangeNotifier {
   int _currentIndex = -1;
   final Map<String, GlobalKey> _targets = {};
 
-  SpotlightController({required this.steps});
+  final VoidCallback? onTourStarted;
+  final VoidCallback? onTourCompleted;
+  final VoidCallback? onTourSkipped;
+
+  SpotlightController({
+    required this.steps,
+    this.onTourStarted,
+    this.onTourCompleted,
+    this.onTourSkipped,
+  });
 
   int get currentIndex => _currentIndex;
   bool get isTourActive => _currentIndex != -1;
@@ -49,6 +60,7 @@ class SpotlightController extends ChangeNotifier {
   void start() {
     if (steps.isNotEmpty) {
       _currentIndex = 0;
+      onTourStarted?.call();
       notifyListeners();
     }
   }
@@ -56,15 +68,33 @@ class SpotlightController extends ChangeNotifier {
   void next() {
     if (_currentIndex < steps.length - 1) {
       _currentIndex++;
+      notifyListeners();
     } else {
-      stop();
+      _complete();
     }
-    notifyListeners();
+  }
+
+  void previous() {
+    if (_currentIndex > 0) {
+      _currentIndex--;
+      notifyListeners();
+    }
   }
 
   void stop() {
-    _currentIndex = -1;
-    notifyListeners();
+    if (isTourActive) {
+      _currentIndex = -1;
+      onTourSkipped?.call();
+      notifyListeners();
+    }
+  }
+
+  void _complete() {
+    if (isTourActive) {
+      _currentIndex = -1;
+      onTourCompleted?.call();
+      notifyListeners();
+    }
   }
 
   GlobalKey? getKeyForCurrentStep() {
@@ -116,22 +146,31 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
         builder: (context) {
           final key = _activeController!.getKeyForCurrentStep();
           if (key == null || key.currentContext == null) {
+            // Wait for the target to be laid out.
+            WidgetsBinding.instance
+                .addPostFrameCallback((_) => _updateOverlay());
             return const SizedBox.shrink();
           }
 
           final renderBox = key.currentContext!.findRenderObject() as RenderBox;
           final targetSize = renderBox.size;
           final targetOffset = renderBox.localToGlobal(Offset.zero);
-
           final currentStep = _activeController!.currentStep!;
 
+          final targetRect = Rect.fromLTWH(
+            targetOffset.dx - currentStep.padding.left,
+            targetOffset.dy - currentStep.padding.top,
+            targetSize.width + currentStep.padding.horizontal,
+            targetSize.height + currentStep.padding.vertical,
+          );
+
           return _SpotlightOverlay(
-            targetOffset: targetOffset,
-            targetSize: targetSize,
+            targetRect: targetRect,
             shape: currentStep.shape,
             text: currentStep.text,
             tooltipBuilder: currentStep.tooltipBuilder,
-            onTap: () => _activeController?.next(),
+            onNext: () => _activeController?.next(),
+            onPrevious: () => _activeController?.previous(),
             onSkip: _stopTour,
           );
         },
@@ -184,28 +223,27 @@ class _SpotlightTargetState extends State<SpotlightTarget> {
 
 // The actual overlay widget that draws the spotlight and text
 class _SpotlightOverlay extends StatelessWidget {
-  final Offset targetOffset;
-  final Size targetSize;
+  final Rect targetRect;
   final SpotlightShape shape;
   final String? text;
   final SpotlightTooltipBuilder? tooltipBuilder;
-  final VoidCallback onTap;
+  final VoidCallback onNext;
+  final VoidCallback onPrevious;
   final VoidCallback onSkip;
 
   const _SpotlightOverlay({
-    required this.targetOffset,
-    required this.targetSize,
+    required this.targetRect,
     required this.shape,
     this.text,
     this.tooltipBuilder,
-    required this.onTap,
+    required this.onNext,
+    required this.onPrevious,
     required this.onSkip,
   });
 
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
-    final targetRect = targetOffset & targetSize;
 
     // Determine if tooltip should be above or below the target
     final bool isTooltipBelow = targetRect.center.dy < screenSize.height / 2;
@@ -216,11 +254,9 @@ class _SpotlightOverlay extends StatelessWidget {
         children: [
           // Background scrim
           GestureDetector(
-            onTap: onTap,
+            onTap: onNext,
             child: ColorFiltered(
               colorFilter: const ColorFilter.mode(
-                // Replaced deprecated withOpacity with Color.fromARGB
-                // 0.6 * 255 = 153
                 Color.fromARGB(153, 0, 0, 0),
                 BlendMode.srcOut,
               ),
@@ -233,9 +269,9 @@ class _SpotlightOverlay extends StatelessWidget {
                     ),
                   ),
                   Positioned(
-                    top: targetOffset.dy,
-                    left: targetOffset.dx,
-                    child: _buildHighlight(targetSize),
+                    top: targetRect.top,
+                    left: targetRect.left,
+                    child: _buildHighlight(targetRect.size),
                   ),
                 ],
               ),
@@ -249,7 +285,7 @@ class _SpotlightOverlay extends StatelessWidget {
             left: 20,
             right: 20,
             child: tooltipBuilder != null
-                ? tooltipBuilder!(onTap, onSkip)
+                ? tooltipBuilder!(onNext, onPrevious, onSkip)
                 : _buildDefaultTooltipContent(),
           ),
           // Skip button
@@ -307,12 +343,19 @@ class _SpotlightOverlay extends StatelessWidget {
             style: const TextStyle(fontSize: 16, color: Colors.black87),
           ),
           const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton(
-              onPressed: onTap,
-              child: const Text('Next'),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: onPrevious,
+                child: const Text('Previous'),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: onNext,
+                child: const Text('Next'),
+              ),
+            ],
           ),
         ],
       ),

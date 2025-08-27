@@ -2,7 +2,13 @@
 
 **Feature Spotlight** is a simple, declarative Flutter package for creating guided tours and feature showcases. Effortlessly highlight widgets to guide your users through new features or complex UIs with smooth animations and fully customizable tooltips.
 
-------------------------------------------------------------------------
+## 📸 Screenshots
+
+<p align="center">
+  <img src="screenshots/1.png" alt="Circular Spotlight" width="200"/>
+  <img src="screenshots/2.png" alt="Rectangular Spotlight" width="200"/>
+  <img src="screenshots/3.png" alt="Custom Tooltip" width="200"/>
+</p>
 
 ## ✨ Features
 
@@ -13,8 +19,6 @@
 -   🔍 **Multiple Shapes** -- Support for circle, rectangle, and custom spotlight shapes.
 -   📱 **Responsive** -- Works seamlessly across different screen sizes and orientations.
 
-------------------------------------------------------------------------
-
 ## 🚀 Installation
 
 Add `feature_spotlight` to your `pubspec.yaml`:
@@ -23,7 +27,7 @@ Add `feature_spotlight` to your `pubspec.yaml`:
 dependencies:
   flutter:
     sdk: flutter
-  feature_spotlight: ^1.0.0  # Use the latest version from pub.dev
+  feature_spotlight: ^1.1.0  # Use the latest version from pub.dev
 ```
 
 Install the package:
@@ -31,8 +35,6 @@ Install the package:
 ```sh
 flutter pub get
 ```
-
-------------------------------------------------------------------------
 
 ## 📱 Basic Usage
 
@@ -73,6 +75,7 @@ class _MyHomePageState extends State<MyHomePage> {
           id: 'profile-icon',
           text: 'This is the default tooltip. Tap here to see your profile.',
           shape: SpotlightShape.circle,
+          padding: const EdgeInsets.all(8),
         ),
         SpotlightStep(
           id: 'settings-button',
@@ -85,6 +88,9 @@ class _MyHomePageState extends State<MyHomePage> {
           shape: SpotlightShape.circle,
         ),
       ],
+      onTourCompleted: () {
+        print('Tour completed!');
+      },
     );
   }
 
@@ -135,17 +141,15 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 ```
 
-------------------------------------------------------------------------
-
 ## 🎨 Full Customization
 
-For complete control over the tooltip's appearance, use the `tooltipBuilder` property on a `SpotlightStep`. This function gives you `onNext` and `onSkip` callbacks to control the tour:
+For complete control over the tooltip's appearance, use the `tooltipBuilder` property on a `SpotlightStep`. This function now gives you `onNext`, `onPrevious`, and `onSkip` callbacks to control the tour:
 
 ```dart
 SpotlightStep(
   id: 'add-button',
   shape: SpotlightShape.circle,
-  tooltipBuilder: (onNext, onSkip) {
+  tooltipBuilder: (onNext, onPrevious, onSkip) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -180,9 +184,9 @@ SpotlightStep(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: onSkip,
+                onPressed: onPrevious,
                 child: const Text(
-                  'Exit',
+                  'Previous',
                   style: TextStyle(color: Colors.white),
                 ),
               ),
@@ -204,8 +208,6 @@ SpotlightStep(
 ),
 ```
 
-------------------------------------------------------------------------
-
 ## 📋 SpotlightStep Properties
 
 | Property | Type | Description |
@@ -213,9 +215,8 @@ SpotlightStep(
 | `id` | `String` | Unique identifier for the step |
 | `text` | `String?` | Default tooltip text (optional if using `tooltipBuilder`) |
 | `shape` | `SpotlightShape` | Shape of the spotlight (`circle`, `rectangle`) |
-| `tooltipBuilder` | `Widget Function(VoidCallback, VoidCallback)?` | Custom tooltip builder with `onNext` and `onSkip` callbacks |
-
-------------------------------------------------------------------------
+| `padding` | `EdgeInsets` | Padding around the highlighted widget. Defaults to `EdgeInsets.zero`. |
+| `tooltipBuilder` | `Widget Function(VoidCallback, VoidCallback, VoidCallback)?` | Custom tooltip builder with `onNext`, `onPrevious`, and `onSkip` callbacks |
 
 ## 🔄 Showing the Tour Only Once
 
@@ -261,6 +262,16 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    _controller = SpotlightController(
+      steps: [...],
+      onTourCompleted: () {
+        _markTourAsSeen();
+      },
+      onTourSkipped: () {
+        _markTourAsSeen();
+      },
+    );
+
     return Scaffold(
       // ... your UI
       bottomNavigationBar: Padding(
@@ -269,7 +280,6 @@ class _MyHomePageState extends State<MyHomePage> {
             ? ElevatedButton(
                 onPressed: () {
                   FeatureSpotlight.of(context).startTour(_controller);
-                  _markTourAsSeen();
                 },
                 child: const Text('Start Tour'),
               )
@@ -286,20 +296,7 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 ```
 
-------------------------------------------------------------------------
-
 ## 🛠 Advanced Usage
-
-### Custom Spotlight Shapes
-
-```dart
-SpotlightStep(
-  id: 'custom-widget',
-  shape: SpotlightShape.rectangle,
-  // Add custom padding around the spotlight
-  padding: const EdgeInsets.all(8.0),
-),
-```
 
 ### Programmatic Tour Control
 
@@ -310,11 +307,15 @@ class TourManager {
   }
 
   static void skipTour(BuildContext context) {
-    FeatureSpotlight.of(context).skipTour();
+    // Note: It's better to call controller.stop() directly
   }
 
-  static void nextStep(BuildContext context) {
-    FeatureSpotlight.of(context).nextStep();
+  static void nextStep(BuildContext context, SpotlightController controller) {
+    controller.next();
+  }
+
+  static void previousStep(BuildContext context, SpotlightController controller) {
+    controller.previous();
   }
 }
 ```
@@ -338,8 +339,6 @@ _controller = SpotlightController(
 );
 ```
 
-------------------------------------------------------------------------
-
 ## 📝 Best Practices
 
 ### ✅ Do's
@@ -357,8 +356,6 @@ _controller = SpotlightController(
 - **Don't block critical functionality** -- Ensure users can still use the app
 - **Don't use tiny touch targets** -- Make buttons easy to tap
 
-------------------------------------------------------------------------
-
 ## 🤝 Contributing
 
 Contributions are welcome! If you find a bug or want a new feature:
@@ -367,23 +364,15 @@ Contributions are welcome! If you find a bug or want a new feature:
 2. **Open a detailed issue** describing the problem or enhancement
 3. **Submit a pull request** with your changes
 
-------------------------------------------------------------------------
-
 ## 📜 License
 
 This package is licensed under the **MIT License**. See the LICENSE file for details.
 
-------------------------------------------------------------------------
-
 ## 🔗 Links
 
 - **Package**: [pub.dev/packages/feature_spotlight](https://pub.dev/packages/feature_spotlight)
-- **Repository**: [GitHub Repository](https://github.com/your-username/feature_spotlight)
-- **Issues**: [Report bugs or request features](https://github.com/your-username/feature_spotlight/issues)
+- **Repository**: [GitHub Repository](https://github.com/febin52/feature_spotlight)
+- **Issues**: [Report bugs or request features](https://github.com/febin52/feature_spotlight/issues)
 - **Documentation**: [API Documentation](https://pub.dev/documentation/feature_spotlight/latest/)
 
-------------------------------------------------------------------------
-
-**Made with ❤️ for the Flutter community**#   f e a t u r e _ s p o t l i g h t  
- #   f e a t u r e _ s p o t l i g h t  
- 
+**Made with ❤️ for the Flutter community**
